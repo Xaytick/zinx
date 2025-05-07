@@ -3,8 +3,9 @@ package znet
 import (
 	"fmt"
 	"sync/atomic"
-	"zinx/utils"
-	"zinx/ziface"
+
+	"github.com/Xaytick/zinx/utils"
+	"github.com/Xaytick/zinx/ziface"
 )
 
 /*
@@ -23,10 +24,10 @@ type MsgHandler struct {
 // 初始化,创建MsgHandler方法
 func NewMsgHandler() *MsgHandler {
 	return &MsgHandler{
-		Apis: make(map[uint32]ziface.IRouter),
-		TaskQueue: make([]chan ziface.IRequest, utils.GlobalObject.WorkerPoolSize),
-		WorkerPoolSize: utils.GlobalObject.WorkerPoolSize,// 从全局配置中获取
-	}	
+		Apis:           make(map[uint32]ziface.IRouter),
+		TaskQueue:      make([]chan ziface.IRequest, utils.GlobalObject.WorkerPoolSize),
+		WorkerPoolSize: utils.GlobalObject.WorkerPoolSize, // 从全局配置中获取
+	}
 }
 
 // 调度,执行对应的Router消息处理方法
@@ -71,7 +72,7 @@ func (mh *MsgHandler) StartWorkerPool() {
 func (mh *MsgHandler) StartOneWorker(workerID int, taskQueue chan ziface.IRequest) {
 	fmt.Println("Worker ID = ", workerID, " is started...")
 	// 不断的阻塞等待对应消息队列的消息
-	for request := range taskQueue{
+	for request := range taskQueue {
 		// 如果有消息过来，出列的就是一个客户端的Request，执行当前Request所绑定的业务
 		mh.DoMsgHandler(request)
 	}
@@ -79,14 +80,14 @@ func (mh *MsgHandler) StartOneWorker(workerID int, taskQueue chan ziface.IReques
 
 // 将消息交给TaskQueue，由Worker进行处理
 var rrIndex uint32 = 0
+
 func (mh *MsgHandler) SendMsgToTaskQueue(request ziface.IRequest) {
 	// 轮询分配worker, 使用原子操作保证线程安全
 	idx := atomic.AddUint32(&rrIndex, 1)
 	workerID := idx % mh.WorkerPoolSize
 	fmt.Println("Add ConnID = ", request.GetConnection().GetConnID(),
-				"request MsgID = ", request.GetMsgID(), 
-				"to workerID = ", workerID)
+		"request MsgID = ", request.GetMsgID(),
+		"to workerID = ", workerID)
 	// 将消息发送给对应的worker的TaskQueue
 	mh.TaskQueue[workerID] <- request
 }
-

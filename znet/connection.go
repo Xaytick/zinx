@@ -6,8 +6,8 @@ import (
 	"net"
 	"sync"
 
-	"zinx/utils"
-	"zinx/ziface"
+	"github.com/Xaytick/zinx/utils"
+	"github.com/Xaytick/zinx/ziface"
 )
 
 type Connection struct {
@@ -24,7 +24,7 @@ type Connection struct {
 	// 无缓冲管道，用于读、写两个goroutine之间的消息通信
 	msgChan chan []byte
 	// 消息管理MsgId和对应处理方法的消息管理模块
-	MsgHandler ziface.IMsgHandler 
+	MsgHandler ziface.IMsgHandler
 	// 连接属性集合
 	property map[string]interface{}
 	// 保护当前property的锁
@@ -32,16 +32,16 @@ type Connection struct {
 }
 
 func NewConnection(server ziface.IServer, conn *net.TCPConn, connID uint32, msgHandler ziface.IMsgHandler) *Connection {
-	
+
 	c := &Connection{
-		TCPServer: server,
-		Conn:      conn,
-		ConnID:    connID,
-		MsgHandler:msgHandler,
-		isClosed:  false,
-		ExitChan:  make(chan bool, 1),
-		msgChan: make(chan []byte),
-		property: make(map[string]interface{}),
+		TCPServer:  server,
+		Conn:       conn,
+		ConnID:     connID,
+		MsgHandler: msgHandler,
+		isClosed:   false,
+		ExitChan:   make(chan bool, 1),
+		msgChan:    make(chan []byte),
+		property:   make(map[string]interface{}),
 	}
 	// 将新创建的Conn添加到链接管理中
 	c.Register()
@@ -67,7 +67,7 @@ func (c *Connection) StartWriter() {
 	// 不断的阻塞等待channel的消息，进行写给客户端
 	for {
 		select {
-		case data:= <-c.msgChan:
+		case data := <-c.msgChan:
 			// 有数据要写给客户端
 			if _, err := c.Conn.Write(data); err != nil {
 				fmt.Println("Send data error", err)
@@ -91,13 +91,13 @@ func (c *Connection) StartReader() {
 		dp := NewDataPack()
 		// 读取客户端的Msg head, 8个字节的二进制流
 		headData := make([]byte, dp.GetHeadLen())
-		if _, err := io.ReadFull(c.GetTCPConnection(), headData); err !=nil {
+		if _, err := io.ReadFull(c.GetTCPConnection(), headData); err != nil {
 			fmt.Println("read msg head error ", err)
 			break
 		}
 		// 拆包，放在一个msg中
 		msg, err := dp.Unpack(headData)
-		if err!= nil {
+		if err != nil {
 			fmt.Println("server unpack err ", err)
 			break
 		}
@@ -105,18 +105,17 @@ func (c *Connection) StartReader() {
 		var data []byte
 		if msg.GetMsgLen() > 0 {
 			data = make([]byte, msg.GetMsgLen())
-			if _, err := io.ReadFull(c.GetTCPConnection(), data); err!=nil {
+			if _, err := io.ReadFull(c.GetTCPConnection(), data); err != nil {
 				fmt.Println("read msg data error ", err)
 				break
 			}
 		}
 		msg.SetData(data)
 
-
 		// 得到当前连接的Request
 		req := Request{
-			conn: c, 
-			msg: msg,
+			conn: c,
+			msg:  msg,
 		}
 		// 从路由中找到注册绑定的Conn对应的MsgHandler调用
 		if utils.GlobalObject.WorkerPoolSize > 0 {
@@ -127,7 +126,7 @@ func (c *Connection) StartReader() {
 			go c.MsgHandler.DoMsgHandler(&req)
 		}
 	}
-	
+
 }
 
 // 提供一个SendMsg方法，将我们要发送给客户端的数据，先进行封包，再发送
@@ -138,7 +137,7 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 	// 将data进行封包
 	dp := NewDataPack()
 	binaryMsg, err := dp.Pack(NewMsgPackage(msgId, data))
-	if err!= nil {
+	if err != nil {
 		fmt.Println("Pack error msg id = ", msgId)
 		return err
 	}
@@ -150,7 +149,7 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 func (c *Connection) Start() {
 	fmt.Println("Conn Start()... ConnID = ", c.ConnID)
 	// 启动当前连接的读数据业务
-	go c.StartReader()	
+	go c.StartReader()
 	// 启动当前连接的写数据业务
 	go c.StartWriter()
 	// 按照开发者传递进来的创建连接时需要处理的业务，执行hook方法
@@ -174,15 +173,15 @@ func (c *Connection) Stop() {
 	c.ExitChan <- true
 	// 回收资源
 	close(c.msgChan)
-	close(c.ExitChan)	
+	close(c.ExitChan)
 }
 
 func (c *Connection) GetTCPConnection() *net.TCPConn {
-	return c.Conn	
+	return c.Conn
 }
 
 func (c *Connection) GetConnID() uint32 {
-	return c.ConnID	
+	return c.ConnID
 }
 
 func (c *Connection) RemoteAddr() net.Addr {
@@ -190,7 +189,7 @@ func (c *Connection) RemoteAddr() net.Addr {
 }
 
 func (c *Connection) Send(data []byte) error {
-	return nil	
+	return nil
 }
 
 // 设置连接属性

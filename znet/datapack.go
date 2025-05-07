@@ -3,8 +3,9 @@ package znet
 import (
 	"bytes"
 	"encoding/binary"
-	"zinx/utils"
-	"zinx/ziface"
+
+	"github.com/Xaytick/zinx/utils"
+	"github.com/Xaytick/zinx/ziface"
 
 	"github.com/pkg/errors"
 )
@@ -21,11 +22,9 @@ PASS
 ok      zinx/znet       0.639s
 */
 type DataPack struct {
-	
 }
 
-
-func NewDataPack() *DataPack {	
+func NewDataPack() *DataPack {
 	return &DataPack{}
 }
 
@@ -40,16 +39,16 @@ func (dp *DataPack) Pack(msg ziface.IMessage) ([]byte, error) {
 
 	// 将datalen写进databuf中
 	if err := binary.Write(databuf, binary.LittleEndian, msg.GetMsgLen()); err != nil {
-		return nil, err	
+		return nil, err
 	}
 
 	// 将MsgId写进databuf中
-	if err := binary.Write(databuf, binary.LittleEndian, msg.GetMsgId()); err!= nil {
+	if err := binary.Write(databuf, binary.LittleEndian, msg.GetMsgId()); err != nil {
 		return nil, err
 	}
 
 	// 将data数据写进databuf中
-	if err := binary.Write(databuf, binary.LittleEndian, msg.GetData()); err!= nil {
+	if err := binary.Write(databuf, binary.LittleEndian, msg.GetData()); err != nil {
 		return nil, err
 	}
 
@@ -68,7 +67,7 @@ func (dp *DataPack) Unpack(binaryData []byte) (ziface.IMessage, error) {
 	}
 
 	// 读msgID
-	if err := binary.Read(databuf, binary.LittleEndian, &msg.Id); err!= nil {
+	if err := binary.Read(databuf, binary.LittleEndian, &msg.Id); err != nil {
 		return nil, err
 	}
 

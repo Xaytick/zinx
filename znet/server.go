@@ -3,8 +3,9 @@ package znet
 import (
 	"fmt"
 	"net"
-	"zinx/utils"
-	"zinx/ziface"
+
+	"github.com/Xaytick/zinx/utils"
+	"github.com/Xaytick/zinx/ziface"
 )
 
 type Server struct {
@@ -28,11 +29,11 @@ type Server struct {
 
 func NewServer(name string) *Server {
 	s := &Server{
-		Name:      utils.GlobalObject.Name,
-		IPVersion: "tcp4",
-		IP:        utils.GlobalObject.Host,
-		Port:      utils.GlobalObject.TcpPort,
-		MsgHandler: NewMsgHandler(),
+		Name:        utils.GlobalObject.Name,
+		IPVersion:   "tcp4",
+		IP:          utils.GlobalObject.Host,
+		Port:        utils.GlobalObject.TcpPort,
+		MsgHandler:  NewMsgHandler(),
 		ConnManager: NewConnManager(),
 	}
 	return s
@@ -40,13 +41,13 @@ func NewServer(name string) *Server {
 
 func (s *Server) Start() {
 	fmt.Println("[zinx] Server name:", utils.GlobalObject.Name,
-	". Server Listener at IP: ", utils.GlobalObject.Host,
-	", Port ", utils.GlobalObject.TcpPort)
+		". Server Listener at IP: ", utils.GlobalObject.Host,
+		", Port ", utils.GlobalObject.TcpPort)
 
 	fmt.Println("[zinx] Version:", utils.GlobalObject.Version,
-	". MaxConn:", utils.GlobalObject.MaxConn,
-	". MaxPackageSize:", utils.GlobalObject.MaxPackageSize)
-	
+		". MaxConn:", utils.GlobalObject.MaxConn,
+		". MaxPackageSize:", utils.GlobalObject.MaxPackageSize)
+
 	go func() {
 		// 0.启动worker工作池
 		s.MsgHandler.StartWorkerPool()
@@ -56,7 +57,7 @@ func (s *Server) Start() {
 			fmt.Println("resolve tcp addr err:", err)
 			return
 		}
-		
+
 		// 2.监听服务器的地址
 		listener, err := net.ListenTCP(s.IPVersion, addr)
 		if err != nil {
@@ -71,9 +72,9 @@ func (s *Server) Start() {
 		for {
 			// 如果有客户端链接过来，阻塞会返回
 			conn, err := listener.AcceptTCP()
-			if err!= nil {
+			if err != nil {
 				fmt.Println("Accept err:", err)
-				continue	
+				continue
 			}
 
 			// 设置服务器最大连接控制，如果超过最大连接，那么则关闭此新的连接
@@ -86,7 +87,7 @@ func (s *Server) Start() {
 			cid++
 
 			go dealConn.Start()
-		}	
+		}
 	}()
 }
 
@@ -135,7 +136,7 @@ func (s *Server) CallOnConnStart(conn ziface.IConnection) {
 
 // 调用OnConnStop钩子函数的方法
 func (s *Server) CallOnConnStop(conn ziface.IConnection) {
-	if s.OnConnStop!= nil {
+	if s.OnConnStop != nil {
 		fmt.Println("---> Call OnConnStop()...")
 		s.OnConnStop(conn)
 	}

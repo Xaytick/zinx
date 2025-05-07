@@ -1,4 +1,4 @@
-module zinx
+module github.com/Xaytick/zinx
 
 go 1.24.1
 
