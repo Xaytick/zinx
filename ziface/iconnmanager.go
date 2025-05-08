@@ -14,4 +14,6 @@ type IConnManager interface {
 	Size() int
 	//清除并终止所有连接
 	ClearConns()
+	// 获取所有连接
+	All() []IConnection
 }

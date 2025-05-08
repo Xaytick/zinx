@@ -81,3 +81,14 @@ func (cm *ConnManager) ClearConns() {
 	}
 
 }
+
+// 获取所有连接
+func (cm *ConnManager) All() []ziface.IConnection {
+    cm.connLock.RLock()
+    defer cm.connLock.RUnlock()
+    conns := make([]ziface.IConnection, 0, len(cm.connections))
+    for _, conn := range cm.connections {
+        conns = append(conns, conn)
+    }
+    return conns
+}
