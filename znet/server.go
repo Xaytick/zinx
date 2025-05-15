@@ -25,17 +25,26 @@ type Server struct {
 	OnConnStart func(conn ziface.IConnection)
 	// 当前Server的连接断开时的Hook函数
 	OnConnStop func(conn ziface.IConnection)
+	// 心跳检测是否开启
+	HeartbeatEnabled bool
 }
 
 func NewServer(name string) *Server {
 	s := &Server{
-		Name:        utils.GlobalObject.Name,
-		IPVersion:   "tcp4",
-		IP:          utils.GlobalObject.Host,
-		Port:        utils.GlobalObject.TcpPort,
-		MsgHandler:  NewMsgHandler(),
-		ConnManager: NewConnManager(),
+		Name:             utils.GlobalObject.Name,
+		IPVersion:        "tcp4",
+		IP:               utils.GlobalObject.Host,
+		Port:             utils.GlobalObject.TcpPort,
+		MsgHandler:       NewMsgHandler(),
+		ConnManager:      NewConnManager(),
+		HeartbeatEnabled: true, // 默认开启心跳检测
 	}
+
+	// 注册心跳路由
+	if s.HeartbeatEnabled {
+		s.AddRouter(utils.PING_MSG_ID, &HeartbeatRouter{})
+	}
+
 	return s
 }
 
@@ -47,6 +56,12 @@ func (s *Server) Start() {
 	fmt.Println("[zinx] Version:", utils.GlobalObject.Version,
 		". MaxConn:", utils.GlobalObject.MaxConn,
 		". MaxPackageSize:", utils.GlobalObject.MaxPackageSize)
+
+	if s.HeartbeatEnabled {
+		fmt.Printf("[zinx] Heartbeat: Enabled (Interval: %ds, Timeout: %ds)\n",
+			utils.GlobalObject.HeartbeatInterval,
+			utils.GlobalObject.HeartbeatTimeout)
+	}
 
 	go func() {
 		// 0.启动worker工作池
@@ -89,6 +104,16 @@ func (s *Server) Start() {
 			go dealConn.Start()
 		}
 	}()
+}
+
+// 设置是否开启心跳检测
+func (s *Server) SetHeartbeat(enabled bool) {
+	s.HeartbeatEnabled = enabled
+
+	// 如果开启心跳检测，注册心跳路由，SetHeartbeat不需要重启服务器
+	if enabled {
+		s.AddRouter(utils.PING_MSG_ID, &HeartbeatRouter{})
+	}
 }
 
 func (s *Server) AddRouter(msgID uint32, router ziface.IRouter) {

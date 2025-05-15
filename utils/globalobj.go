@@ -24,6 +24,9 @@ type GlobalObj struct {
 	MaxPackageSize uint32 // 当前Zinx框架数据包的最大值
 	WorkerPoolSize uint32 // 业务工作Worker池的大小
 	MaxTaskLen     uint32 // 业务工作Worker对应负责的任务队列最大任务存储数量, 允许用户最多开辟多少个worker
+	// 心跳相关
+	HeartbeatInterval int // 心跳检测间隔时间，单位为秒
+	HeartbeatTimeout  int // 心跳超时时间，单位为秒
 }
 
 // 定义一个全局的对外GlobalObj
@@ -41,6 +44,9 @@ func init() {
 		MaxPackageSize: 4096,
 		WorkerPoolSize: 10,
 		MaxTaskLen:     1024,
+		// 默认心跳配置
+		HeartbeatInterval: 60,  // 默认60秒检测一次
+		HeartbeatTimeout:  180, // 默认180秒超时
 	}
 
 	// 应该通过zinx.json来加载自定义的参数
@@ -50,9 +56,8 @@ func init() {
 // 加载用户自定义的配置文件
 func (g *GlobalObj) Reload() {
 	data, err := os.ReadFile("conf/zinx.json")
-	json.Unmarshal(data, &GlobalObject)
 	if err != nil {
 		panic(err)
 	}
-
+	json.Unmarshal(data, &GlobalObject)
 }

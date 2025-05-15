@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/Xaytick/zinx/utils"
 	"github.com/Xaytick/zinx/ziface"
@@ -29,19 +30,22 @@ type Connection struct {
 	property map[string]interface{}
 	// 保护当前property的锁
 	propertyLock sync.RWMutex
+	// 最后一次活动时间
+	lastActivityTime time.Time
 }
 
 func NewConnection(server ziface.IServer, conn *net.TCPConn, connID uint32, msgHandler ziface.IMsgHandler) *Connection {
 
 	c := &Connection{
-		TCPServer:  server,
-		Conn:       conn,
-		ConnID:     connID,
-		MsgHandler: msgHandler,
-		isClosed:   false,
-		ExitChan:   make(chan bool, 1),
-		msgChan:    make(chan []byte),
-		property:   make(map[string]interface{}),
+		TCPServer:        server,
+		Conn:             conn,
+		ConnID:           connID,
+		MsgHandler:       msgHandler,
+		isClosed:         false,
+		ExitChan:         make(chan bool, 1),
+		msgChan:          make(chan []byte),
+		property:         make(map[string]interface{}),
+		lastActivityTime: time.Now(), // 初始化时记录当前时间
 	}
 	// 将新创建的Conn添加到链接管理中
 	c.Register()
@@ -112,6 +116,9 @@ func (c *Connection) StartReader() {
 		}
 		msg.SetData(data)
 
+		// 更新最后活动时间
+		c.UpdateActivity()
+
 		// 得到当前连接的Request
 		req := Request{
 			conn: c,
@@ -126,7 +133,47 @@ func (c *Connection) StartReader() {
 			go c.MsgHandler.DoMsgHandler(&req)
 		}
 	}
+}
 
+// 心跳检测
+func (c *Connection) startHeartbeat() {
+	// 心跳检测间隔
+	interval := time.Duration(utils.GlobalObject.HeartbeatInterval) * time.Second
+	// 心跳超时时间
+	timeout := time.Duration(utils.GlobalObject.HeartbeatTimeout) * time.Second
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// 检查最后活动时间，如果超时则关闭连接
+			if time.Since(c.lastActivityTime) > timeout {
+				fmt.Printf("心跳超时，关闭连接 ConnID=%d, IP=%s, 最后活动: %s\n",
+					c.ConnID, c.RemoteAddr().String(), c.lastActivityTime.Format("2006-01-02 15:04:05"))
+				c.Stop()
+				return
+			}
+		case <-c.ExitChan:
+			// 连接已关闭，退出心跳检测
+			return
+		}
+	}
+}
+
+// 更新最后活动时间
+func (c *Connection) UpdateActivity() {
+	c.propertyLock.Lock()
+	c.lastActivityTime = time.Now()
+	c.propertyLock.Unlock()
+}
+
+// 获取最后活动时间
+func (c *Connection) GetLastActivityTime() time.Time {
+	c.propertyLock.RLock()
+	defer c.propertyLock.RUnlock()
+	return c.lastActivityTime
 }
 
 // 提供一个SendMsg方法，将我们要发送给客户端的数据，先进行封包，再发送
@@ -152,10 +199,13 @@ func (c *Connection) Start() {
 	go c.StartReader()
 	// 启动当前连接的写数据业务
 	go c.StartWriter()
+	// 启动心跳检测
+	go c.startHeartbeat()
 	// 按照开发者传递进来的创建连接时需要处理的业务，执行hook方法
 	c.TCPServer.CallOnConnStart(c)
 }
 
+// 停止连接，结束当前连接状态
 func (c *Connection) Stop() {
 	fmt.Println("Conn Stop()... ConnID = ", c.ConnID)
 	// 如果当前连接已经关闭

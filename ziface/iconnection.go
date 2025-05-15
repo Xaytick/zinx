@@ -1,9 +1,12 @@
 package ziface
 
-import "net"
+import (
+	"net"
+	"time"
+)
 
 type IConnection interface {
-	
+
 	// 启动连接，让当前连接开始工作
 	Start()
 
@@ -33,6 +36,12 @@ type IConnection interface {
 
 	//移除连接属性
 	RemoveProperty(key string)
+
+	//更新心跳活动时间
+	UpdateActivity()
+
+	//获取最后活动时间
+	GetLastActivityTime() time.Time
 }
 
 type HandleFunc func(*net.TCPConn, []byte, int) error
