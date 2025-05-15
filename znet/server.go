@@ -109,11 +109,6 @@ func (s *Server) Start() {
 // 设置是否开启心跳检测
 func (s *Server) SetHeartbeat(enabled bool) {
 	s.HeartbeatEnabled = enabled
-
-	// 如果开启心跳检测，注册心跳路由，SetHeartbeat不需要重启服务器
-	if enabled {
-		s.AddRouter(utils.PING_MSG_ID, &HeartbeatRouter{})
-	}
 }
 
 func (s *Server) AddRouter(msgID uint32, router ziface.IRouter) {
