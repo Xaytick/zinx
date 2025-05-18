@@ -25,13 +25,15 @@ func NewConnManager() *ConnManager {
 
 // 添加连接
 func (cm *ConnManager) Add(conn ziface.IConnection) {
-	// 保护共享资源map,加写锁
 	cm.connLock.Lock()
-	defer cm.connLock.Unlock()
-	// 将conn加入到ConnManager中
 	cm.connections[conn.GetConnID()] = conn
+	// 获取当前连接数，必须在释放写锁之前或持有读锁的情况下进行
+	// 为避免在Println中调用Size()再次锁connLock，我们在这里直接获取长度
+	currentSize := len(cm.connections)
+	cm.connLock.Unlock() // 在调用 fmt.Println 和 cm.Size() 之前解锁
+
 	fmt.Println("connID = ", conn.GetConnID(),
-		"add to ConnManager successfully: conn num = ", cm.Size())
+		"add to ConnManager successfully: conn num = ", currentSize) // 使用保存的长度值
 }
 
 // 删除连接
@@ -84,18 +86,27 @@ func (cm *ConnManager) Size() int {
 // 清除并终止所有连接
 func (cm *ConnManager) ClearConns() {
 	cm.connLock.Lock()
-	cm.userLock.Lock() // Lock userToConn as well
-	defer cm.connLock.Unlock()
-	defer cm.userLock.Unlock()
-
-	for connID, conn := range cm.connections {
-		conn.Stop()
-		delete(cm.connections, connID)
+	// Create a slice of connections to stop AFTER releasing the lock
+	connsToStop := make([]ziface.IConnection, 0, len(cm.connections))
+	for _, conn := range cm.connections {
+		connsToStop = append(connsToStop, conn)
 	}
-	cm.userToConn = make(map[uint]uint32) // Clear userToConn map
+	// Clear the connections map while still holding the lock
+	cm.connections = make(map[uint32]ziface.IConnection)
+	cm.connLock.Unlock() // Release connLock before stopping connections
 
-	// Simplified logging
-	fmt.Println("Clear All Connections and User Mappings successfully: conn num = ", len(cm.connections), ", user map size = ", len(cm.userToConn))
+	cm.userLock.Lock()
+	cm.userToConn = make(map[uint]uint32) // Clear userToConn map
+	cm.userLock.Unlock()                  // Release userLock
+
+	// Now stop each connection. This will call Remove, which will try to lock, but it should be fine now.
+	for _, conn := range connsToStop {
+		conn.Stop() // This will call Remove(), which will attempt its own locking.
+	}
+
+	fmt.Println("Clear All Connections and User Mappings initiated. Actual removal happens in conn.Stop().")
+	// Note: The final count might be 0 after all Stop() calls complete if they are synchronous.
+	// The log here reflects the state after maps are cleared but before all Stop() might have finished if async.
 }
 
 // 获取所有连接
@@ -113,18 +124,16 @@ func (cm *ConnManager) All() []ziface.IConnection {
 func (cm *ConnManager) SetConnByUserID(connID uint32, userID uint) {
 	// First, ensure the connection actually exists
 	cm.connLock.RLock()
-	_, connExists := cm.connections[connID]
+	_, ok := cm.connections[connID]
 	cm.connLock.RUnlock()
 
-	if !connExists {
+	if !ok {
 		fmt.Printf("SetConnByUserID: ConnID %d does not exist. Cannot associate userID %d.\n", connID, userID)
 		return
 	}
 
 	cm.userLock.Lock()
 	defer cm.userLock.Unlock()
-	// Optional: Handle if userID is already mapped to another connID (e.g. single login policy)
-	// For now, simply overwrite.
 	cm.userToConn[userID] = connID
 	fmt.Printf("Associated UserID %d with ConnID %d\n", userID, connID)
 }
@@ -148,20 +157,14 @@ func (cm *ConnManager) GetConnByUserID(userID uint) ziface.IConnection {
 	cm.userLock.RUnlock()
 
 	if !ok {
-		return nil // UserID not found in map
+		return nil
 	}
 
-	// Now get the connection using the connID
 	cm.connLock.RLock()
 	defer cm.connLock.RUnlock()
 	conn, connOk := cm.connections[connID]
 	if !connOk {
-		// This case should ideally not happen if Remove() correctly cleans userToConn.
-		// But as a safeguard:
 		fmt.Printf("GetConnByUserID: Found connID %d for userID %d, but connID not in connections map.\n", connID, userID)
-		// Clean up the stale entry from userToConn
-		// To do this safely without deadlocking, we might need a more complex lock or deferred unlock sequence.
-		// For now, just returning nil. A more robust solution would handle this cleanup.
 		return nil
 	}
 	return conn
