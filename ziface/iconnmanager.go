@@ -16,4 +16,10 @@ type IConnManager interface {
 	ClearConns()
 	// 获取所有连接
 	All() []IConnection
+	// 根据UserID获取连接
+	GetConnByUserID(userID uint) IConnection
+	// 根据UserID设置连接
+	SetConnByUserID(connID uint32, userID uint)
+	// 根据UserID清除连接
+	ClearConnByUserID(userID uint)
 }
